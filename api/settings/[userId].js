@@ -1,6 +1,6 @@
-import { sql } from '@vercel/postgres';
+const { sql } = require('@vercel/postgres');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   const userId = req.query.userId || req.url.split('/').pop();
   
   if (!userId || typeof userId !== 'string') {
@@ -56,4 +56,4 @@ export default async function handler(req, res) {
     console.error('Settings API error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
-}
+};

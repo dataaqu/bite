@@ -1,6 +1,6 @@
-import { sql } from '@vercel/postgres';
+const { sql } = require('@vercel/postgres');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       // Get food entries
@@ -62,4 +62,4 @@ export default async function handler(req, res) {
     console.error('Entries API error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
-}
+};
