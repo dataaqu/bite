@@ -7,6 +7,7 @@ import { DailySummary } from './components/DailySummary';
 import { NutritionCard } from './components/NutritionCard';
 import { WeightInputPopup } from './components/WeightInputPopup';
 import { DeleteConfirmPopup } from './components/DeleteConfirmPopup';
+import { ImageDetailPopup } from './components/ImageDetailPopup';
 import { CameraIcon, PlusIcon, AppleIcon, CarrotIcon, BreadIcon, MeatIcon, CheeseIcon, MilkIcon, SaladIcon, GrapeIcon } from './components/Icons';
 
 // Helper to compress images before storage to avoid hitting LocalStorage 5MB limit
@@ -96,6 +97,10 @@ export default function App() {
     carbs: 0,
     fat: 0
   });
+
+  // Image popup state
+  const [showImagePopup, setShowImagePopup] = useState(false);
+  const [selectedEntry, setSelectedEntry] = useState<FoodLogEntry | null>(null);
 
   // Persist entries whenever they change
   useEffect(() => {
@@ -268,6 +273,16 @@ export default function App() {
     }
   };
 
+  const handleImageClick = (entry: FoodLogEntry) => {
+    setSelectedEntry(entry);
+    setShowImagePopup(true);
+  };
+
+  const handleCloseImagePopup = () => {
+    setShowImagePopup(false);
+    setSelectedEntry(null);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Sticky Header with Summary */}
@@ -303,6 +318,7 @@ export default function App() {
                 entry={entry} 
                 onDelete={handleDelete}
                 onEdit={handleEditClick}
+                onImageClick={handleImageClick}
             />
           ))}
         </div>
@@ -374,7 +390,7 @@ export default function App() {
                   />
                 </div>
                 <div>
-                   <label className="block text-xs font-medium text-gray-500 mb-1">ნახშირბ. (გ)</label>
+                   <label className="block text-xs font-medium text-gray-500 mb-1">ნახშირწ. (გ)</label>
                    <input 
                     type="number" 
                     value={editForm.carbs}
@@ -426,6 +442,15 @@ export default function App() {
         onConfirm={handleDeleteConfirm}
         onCancel={handleDeleteCancel}
       />
+
+      {/* Image Detail Popup */}
+      {selectedEntry && (
+        <ImageDetailPopup
+          entry={selectedEntry}
+          isOpen={showImagePopup}
+          onClose={handleCloseImagePopup}
+        />
+      )}
     </div>
   );
 }

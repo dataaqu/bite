@@ -206,6 +206,17 @@ export const DailySummary: React.FC<Props> = ({
                     </button>
                 </div>
             </div>
+            
+            {/* Pig image when calories exceeded */}
+            {totals.calories > GOALS.calories && (
+              <div className="flex justify-center lg:justify-end">
+                <img 
+                  src="/assets/pig.png"
+                  alt="კალორიები გადაცილებულია!" 
+                  className="w-24 h-24 lg:w-32 lg:h-32 animate-bounce"
+                />
+              </div>
+            )}
         </div>
 
         {/* Progress Bar for Calories */}
@@ -223,7 +234,7 @@ export const DailySummary: React.FC<Props> = ({
         <div className="grid grid-cols-3 lg:grid-cols-6 xl:grid-cols-3 gap-3 lg:gap-6">
             <div className="space-y-1">
                 <div className="flex justify-between text-xs">
-                    <span className="text-gray-500">ნახშირბ.</span>
+                    <span className="text-gray-500">ნახშირწ.</span>
                     <span className="font-semibold">{Math.round(totals.carbs)}გ</span>
                 </div>
                 <div className="w-full bg-orange-100 rounded-full h-1.5">

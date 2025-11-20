@@ -1,18 +1,19 @@
 
 import React from 'react';
 import { FoodLogEntry } from '../types';
-import { FlameIcon, TrashIcon, PencilIcon } from './Icons';
+import { FlameIcon, TrashIcon, PencilIcon, ClockIcon } from './Icons';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 interface Props {
   entry: FoodLogEntry;
   onDelete: (id: string) => void;
   onEdit: (entry: FoodLogEntry) => void;
+  onImageClick?: (entry: FoodLogEntry) => void;
 }
 
-const COLORS = ['#f27141', '#ffffff', '#e55a2b']; // Orange theme colors
+const COLORS = ['#3b82f6', '#22c55e', '#ef4444']; // Blue (ნახშირწყლები), Green (ცილა), Red (ცხიმი)
 
-export const NutritionCard: React.FC<Props> = ({ entry, onDelete, onEdit }) => {
+export const NutritionCard: React.FC<Props> = ({ entry, onDelete, onEdit, onImageClick }) => {
   const timestampStr = new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   if (entry.loading) {
@@ -65,18 +66,22 @@ export const NutritionCard: React.FC<Props> = ({ entry, onDelete, onEdit }) => {
   const hasImage = !!entry.imageUrl;
   
   const data = [
-    { name: 'ნახშირბ.', value: totalMacros.carbs },
+    { name: 'ნახშირწყლები', value: totalMacros.carbs },
     { name: 'ცილა', value: totalMacros.protein },
     { name: 'ცხიმი', value: totalMacros.fat },
   ];
 
   return (
-    <div className="bg-white rounded-2xl shadow-md overflow-hidden mb-4 lg:mb-0 border" style={{borderColor: '#f27141'}}>
+    <div className="bg-white rounded-2xl shadow-md overflow-hidden mb-4 lg:mb-0 border cursor-pointer hover:shadow-lg transition-shadow duration-200" style={{borderColor: '#f27141'}} onClick={() => onImageClick?.(entry)}>
       <div className={`relative ${hasImage ? 'h-48' : 'h-32'}`}>
         {hasImage ? (
             <>
-                <img src={entry.imageUrl} alt="Meal" className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
+                <img 
+                  src={entry.imageUrl} 
+                  alt="Meal" 
+                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-200" 
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent pointer-events-none" />
             </>
         ) : (
             <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600" />
@@ -98,21 +103,28 @@ export const NutritionCard: React.FC<Props> = ({ entry, onDelete, onEdit }) => {
         </div>
         
         {/* Time Badge */}
-        <div className="absolute top-3 left-3 bg-black/30 backdrop-blur-md text-white px-3 py-1 rounded-full text-xs font-medium border border-white/10">
+        <div className="absolute top-3 left-3 bg-black/30 backdrop-blur-md text-white px-3 py-1 rounded-full text-xs font-medium border border-white/10 flex items-center gap-1">
+          <ClockIcon className="w-3 h-3" />
           {timestampStr}
         </div>
 
         {/* Actions */}
         <div className="absolute top-3 right-3 flex gap-2">
           <button 
-              onClick={() => onEdit(entry)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit(entry);
+              }}
               className="bg-black/30 text-white p-2 rounded-full backdrop-blur-md transition-colors"
               style={{'--hover-bg': '#f27141'}}
           >
               <PencilIcon className="w-4 h-4" />
           </button>
           <button 
-              onClick={() => onDelete(entry.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(entry.id);
+              }}
               className="bg-black/30 hover:bg-red-500 text-white p-2 rounded-full backdrop-blur-md transition-colors"
           >
               <TrashIcon className="w-4 h-4" />
@@ -162,17 +174,17 @@ export const NutritionCard: React.FC<Props> = ({ entry, onDelete, onEdit }) => {
 
         {/* Macro Pills */}
         <div className="grid grid-cols-3 gap-2 mt-2">
-            <div className="flex flex-col items-center p-2 rounded-lg flex-1 border" style={{backgroundColor: 'rgba(242, 113, 65, 0.1)', borderColor: 'rgba(242, 113, 65, 0.3)'}}>
-                <span className="text-[10px] uppercase tracking-wider text-blue-500 font-bold">ნახშირბ.</span>
+            <div className="flex flex-col items-center p-2 rounded-lg flex-1 border" style={{backgroundColor: 'rgba(59, 130, 246, 0.1)', borderColor: 'rgba(59, 130, 246, 0.3)'}}>
+                <span className="text-[10px] uppercase tracking-wider text-blue-500 font-bold">ნახშირწყლები</span>
                 <span className="text-blue-800 font-bold text-lg leading-none mt-0.5">{Math.round(totalMacros.carbs)}გ</span>
             </div>
-            <div className="flex flex-col items-center p-2 rounded-lg flex-1 border" style={{backgroundColor: 'rgba(242, 113, 65, 0.1)', borderColor: 'rgba(242, 113, 65, 0.3)'}}>
+            <div className="flex flex-col items-center p-2 rounded-lg flex-1 border" style={{backgroundColor: 'rgba(34, 197, 94, 0.1)', borderColor: 'rgba(34, 197, 94, 0.3)'}}>
                 <span className="text-[10px] uppercase tracking-wider text-green-500 font-bold">ცილა</span>
                 <span className="text-green-800 font-bold text-lg leading-none mt-0.5">{Math.round(totalMacros.protein)}გ</span>
             </div>
-            <div className="flex flex-col items-center bg-orange-50 p-2 rounded-lg flex-1 border border-orange-100">
-                <span className="text-[10px] uppercase tracking-wider text-orange-500 font-bold">ცხიმი</span>
-                <span className="text-orange-800 font-bold text-lg leading-none mt-0.5">{Math.round(totalMacros.fat)}გ</span>
+            <div className="flex flex-col items-center p-2 rounded-lg flex-1 border" style={{backgroundColor: 'rgba(239, 68, 68, 0.1)', borderColor: 'rgba(239, 68, 68, 0.3)'}}>
+                <span className="text-[10px] uppercase tracking-wider text-red-500 font-bold">ცხიმი</span>
+                <span className="text-red-800 font-bold text-lg leading-none mt-0.5">{Math.round(totalMacros.fat)}გ</span>
             </div>
         </div>
       </div>
