@@ -1,7 +1,6 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { Database } from '../../../lib/db';
+import { sql } from '@vercel/postgres';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -14,14 +13,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Check if user exists
-    let user = await Database.getUserByEmail(email);
+    let result = await sql`
+      SELECT * FROM users WHERE email = ${email} LIMIT 1
+    `;
+    
+    let user = result.rows[0];
     
     if (!user) {
       // Create new user
-      user = await Database.createUser(email, name);
+      result = await sql`
+        INSERT INTO users (email, name) 
+        VALUES (${email}, ${name}) 
+        RETURNING *
+      `;
+      user = result.rows[0];
       
       // Create default settings
-      await Database.createOrUpdateUserSettings(user.id, 2200);
+      await sql`
+        INSERT INTO user_settings (user_id, calorie_goal)
+        VALUES (${user.id}, 2200)
+        ON CONFLICT (user_id) DO NOTHING
+      `;
     }
 
     res.status(200).json({ 

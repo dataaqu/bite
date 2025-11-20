@@ -1,8 +1,7 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { Database } from '../../../lib/db';
+import { sql } from '@vercel/postgres';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const { id } = req.query;
+export default async function handler(req, res) {
+  const id = req.query.id || req.url.split('/').pop();
   
   if (!id || typeof id !== 'string') {
     return res.status(400).json({ error: 'Entry ID is required' });
@@ -17,13 +16,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'user_id is required' });
       }
 
-      const entry = await Database.updateFoodEntry(id, user_id, analysis_data);
+      const result = await sql`
+        UPDATE food_entries 
+        SET analysis_data = ${JSON.stringify(analysis_data)}
+        WHERE id = ${id} AND user_id = ${user_id}
+        RETURNING *
+      `;
       
-      if (!entry) {
+      if (result.rowCount === 0) {
         return res.status(404).json({ error: 'Entry not found' });
       }
 
-      res.status(200).json({ entry });
+      res.status(200).json({ entry: result.rows[0] });
 
     } else if (req.method === 'DELETE') {
       // Delete food entry
@@ -33,9 +37,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: 'user_id is required' });
       }
 
-      const deleted = await Database.deleteFoodEntry(id, user_id);
+      const result = await sql`
+        DELETE FROM food_entries 
+        WHERE id = ${id} AND user_id = ${user_id}
+      `;
       
-      if (!deleted) {
+      if (result.rowCount === 0) {
         return res.status(404).json({ error: 'Entry not found' });
       }
 
