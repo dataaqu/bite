@@ -1,6 +1,6 @@
-const { sql } = require('@vercel/postgres');
+import { sql } from '@vercel/postgres';
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   const userId = req.query.userId || req.url.split('/').pop();
   
   if (!userId || typeof userId !== 'string') {

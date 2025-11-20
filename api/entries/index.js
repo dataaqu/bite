@@ -1,6 +1,6 @@
-const { sql } = require('@vercel/postgres');
+import { sql } from '@vercel/postgres';
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       // Get food entries
