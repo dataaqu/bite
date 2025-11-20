@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { FoodLogEntry, MacroNutrients } from '../types';
 import { ChevronLeftIcon, ChevronRightIcon, PencilIcon, CalendarIcon } from './Icons';
+import biteLogo from '../assets/bite.png';
+import pigImage from '../assets/pig.png';
 
 
 interface Props {
@@ -155,7 +157,7 @@ export const DailySummary: React.FC<Props> = ({
         <div className="flex flex-col lg:flex-row justify-between lg:items-center mb-4 gap-4 lg:gap-0">
           <div className="flex justify-center lg:justify-start items-center">
             <img 
-              src="/assets/bite.png"
+              src={biteLogo}
               alt="Bite Logo" 
               className="w-[280px] h-[280px] lg:w-[200px] lg:h-[200px]"
             />
@@ -211,7 +213,7 @@ export const DailySummary: React.FC<Props> = ({
             {totals.calories > GOALS.calories && (
               <div className="flex justify-center lg:justify-end">
                 <img 
-                  src="/assets/pig.png"
+                  src={pigImage}
                   alt="კალორიები გადაცილებულია!" 
                   className="w-24 h-24 lg:w-32 lg:h-32 animate-bounce"
                 />
