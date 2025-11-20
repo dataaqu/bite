@@ -13,7 +13,10 @@ export default defineConfig(({ mode }) => {
       plugins: [
         react(),
         VitePWA({
-          registerType: 'autoUpdate',
+          registerType: 'prompt',
+          devOptions: {
+            enabled: true
+          },
           includeAssets: ['favicon.png', 'assets/*.png'],
           manifest: {
             name: 'Bite - Food Tracker',
@@ -40,34 +43,7 @@ export default defineConfig(({ mode }) => {
             ]
           },
           workbox: {
-            globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
-            runtimeCaching: [
-              {
-                urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-                handler: 'CacheFirst',
-                options: {
-                  cacheName: 'google-fonts-cache',
-                  expiration: {
-                    maxEntries: 10,
-                    maxAgeSeconds: 60 * 60 * 24 * 365 // 1 year
-                  },
-                  cacheKeyWillBeUsed: async ({ request }) => {
-                    return `${request.url}?v=1`;
-                  }
-                }
-              },
-              {
-                urlPattern: /^https:\/\/cdn\.tailwindcss\.com\/.*/i,
-                handler: 'CacheFirst',
-                options: {
-                  cacheName: 'tailwind-cache',
-                  expiration: {
-                    maxEntries: 5,
-                    maxAgeSeconds: 60 * 60 * 24 * 30 // 1 month
-                  }
-                }
-              }
-            ]
+            globPatterns: ['**/*.{js,css,html,ico,png,svg}']
           }
         })
       ],
