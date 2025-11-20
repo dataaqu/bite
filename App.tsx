@@ -8,6 +8,7 @@ import { NutritionCard } from './components/NutritionCard';
 import { WeightInputPopup } from './components/WeightInputPopup';
 import { DeleteConfirmPopup } from './components/DeleteConfirmPopup';
 import { ImageDetailPopup } from './components/ImageDetailPopup';
+import { PWAInstallPrompt } from './components/PWAInstallPrompt';
 import { CameraIcon, PlusIcon, AppleIcon, CarrotIcon, BreadIcon, MeatIcon, CheeseIcon, MilkIcon, SaladIcon, GrapeIcon } from './components/Icons';
 
 // Helper to compress images before storage to avoid hitting LocalStorage 5MB limit
@@ -451,6 +452,9 @@ export default function App() {
           onClose={handleCloseImagePopup}
         />
       )}
+
+      {/* PWA Install Prompt */}
+      <PWAInstallPrompt />
     </div>
   );
 }
