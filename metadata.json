@@ -1,0 +1,7 @@
+{
+  "name": "Bite",
+  "description": "Snap a photo of your meal to instantly track calories and macronutrients using Gemini AI.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
