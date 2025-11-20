@@ -9,6 +9,9 @@ import { WeightInputPopup } from './components/WeightInputPopup';
 import { DeleteConfirmPopup } from './components/DeleteConfirmPopup';
 import { ImageDetailPopup } from './components/ImageDetailPopup';
 import { PWAInstallPrompt } from './components/PWAInstallPrompt';
+import { AuthPrompt } from './components/AuthPrompt';
+import { AuthService } from './lib/auth';
+import { APIService } from './lib/api';
 import { CameraIcon, PlusIcon, AppleIcon, CarrotIcon, BreadIcon, MeatIcon, CheeseIcon, MilkIcon, SaladIcon, GrapeIcon } from './components/Icons';
 
 // Helper to compress images before storage to avoid hitting LocalStorage 5MB limit
@@ -56,26 +59,15 @@ const compressImage = (file: File): Promise<string> => {
 };
 
 export default function App() {
-  // Load entries from localStorage or default to empty
-  const [entries, setEntries] = useState<FoodLogEntry[]>(() => {
-    try {
-      const saved = localStorage.getItem('snapcalorie_entries');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      console.error("Failed to load entries", e);
-      return [];
-    }
-  });
+  // Database state
+  const [entries, setEntries] = useState<FoodLogEntry[]>([]);
+  const [calorieGoal, setCalorieGoal] = useState<number>(2200);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load goal from localStorage or default to 2200
-  const [calorieGoal, setCalorieGoal] = useState<number>(() => {
-    try {
-      const saved = localStorage.getItem('snapcalorie_goal');
-      return saved ? parseInt(saved, 10) : 2200;
-    } catch (e) {
-      return 2200;
-    }
-  });
+  // Auth state  
+  const [currentUser, setCurrentUser] = useState(AuthService.getCurrentUser());
+  const [showAuthPrompt, setShowAuthPrompt] = useState(false);
 
   const [viewState, setViewState] = useState<ViewState>(ViewState.DASHBOARD);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -103,31 +95,51 @@ export default function App() {
   const [showImagePopup, setShowImagePopup] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<FoodLogEntry | null>(null);
 
-  // Persist entries whenever they change
+  // Load data on mount and when date changes
   useEffect(() => {
+    loadData();
+  }, [currentDate, currentUser]);
+
+  // Load user settings on mount
+  useEffect(() => {
+    loadUserSettings();
+  }, [currentUser]);
+
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    
     try {
-      const now = new Date();
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-
-      const entriesToSave = entries.map(entry => {
-        // If entry is older than start of today, remove imageUrl to save space
-        if (entry.timestamp < startOfToday) {
-             const { imageUrl, ...rest } = entry;
-             return rest;
-        }
-        return entry;
-      });
-
-      localStorage.setItem('snapcalorie_entries', JSON.stringify(entriesToSave));
-    } catch (e) {
-      console.error("Failed to save to local storage - probably quota exceeded", e);
+      const userId = AuthService.getCurrentUserId();
+      const response = await APIService.getFoodEntries(userId, currentDate);
+      
+      if (response.success && response.data) {
+        const foodLogEntries = APIService.convertDBEntriesToFoodLogEntries(response.data);
+        setEntries(foodLogEntries);
+      } else {
+        setError(response.error || 'Failed to load entries');
+      }
+    } catch (error) {
+      setError('Network error occurred');
+      console.error('Error loading data:', error);
+    } finally {
+      setLoading(false);
     }
-  }, [entries]);
+  };
 
-  // Persist goal whenever it changes
-  useEffect(() => {
-    localStorage.setItem('snapcalorie_goal', calorieGoal.toString());
-  }, [calorieGoal]);
+  const loadUserSettings = async () => {
+    if (!currentUser) return;
+    
+    try {
+      const response = await APIService.getUserSettings(currentUser.id);
+      
+      if (response.success && response.data) {
+        setCalorieGoal(response.data.calorie_goal);
+      }
+    } catch (error) {
+      console.error('Error loading user settings:', error);
+    }
+  };
 
   // Filter entries for the currently selected date
   const filteredEntries = useMemo(() => {
@@ -173,31 +185,60 @@ export default function App() {
       // Compress image first
       const compressedBase64 = await compressImage(file);
       
-      const tempId = uuidv4();
+      const userId = AuthService.getCurrentUserId();
+      const timestamp = Date.now();
       
-      const newEntry: FoodLogEntry = {
-        id: tempId,
-        timestamp: Date.now(),
-        imageUrl: compressedBase64,
+      // Create entry in database
+      const response = await APIService.createFoodEntry(
+        userId,
+        timestamp,
+        compressedBase64,
+        undefined, // analysis_data will be added after processing
+        weight
+      );
+
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to create entry');
+      }
+
+      const dbEntry = response.data!;
+      
+      // Create temporary UI entry with loading state
+      const tempEntry: FoodLogEntry = {
+        id: dbEntry.id,
+        timestamp: dbEntry.timestamp,
+        imageUrl: dbEntry.image_url,
         analysis: null,
         loading: true,
-        userProvidedWeight: weight,
+        userProvidedWeight: dbEntry.user_provided_weight,
       };
 
-      setEntries(prev => [newEntry, ...prev]);
+      setEntries(prev => [tempEntry, ...prev]);
       setViewState(ViewState.DASHBOARD);
 
       try {
         const result = await analyzeImage(compressedBase64, weight);
-        setEntries(prev => prev.map(entry => 
-            entry.id === tempId 
-            ? { ...entry, loading: false, analysis: result } 
-            : entry
-        ));
+        
+        // Update entry in database with analysis results
+        const updateResponse = await APIService.updateFoodEntry(
+          dbEntry.id,
+          userId,
+          result
+        );
+
+        if (updateResponse.success) {
+          setEntries(prev => prev.map(entry => 
+              entry.id === dbEntry.id 
+              ? { ...entry, loading: false, analysis: result } 
+              : entry
+          ));
+        } else {
+          throw new Error('Failed to update analysis');
+        }
       } catch (error) {
         console.error(error);
         setEntries(prev => prev.map(entry => 
-            entry.id === tempId 
+            entry.id === dbEntry.id 
             ? { ...entry, loading: false, error: 'სურათის დამუშავება ვერ მოხერხდა.' } 
             : entry
         ));
@@ -219,9 +260,21 @@ export default function App() {
     setShowDeletePopup(true);
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (pendingDeleteId) {
-      setEntries(prev => prev.filter(e => e.id !== pendingDeleteId));
+      try {
+        const userId = AuthService.getCurrentUserId();
+        const response = await APIService.deleteFoodEntry(pendingDeleteId, userId);
+        
+        if (response.success) {
+          setEntries(prev => prev.filter(e => e.id !== pendingDeleteId));
+        } else {
+          alert('წაშლა ვერ მოხერხდა: ' + (response.error || 'უცნობი შეცდომა'));
+        }
+      } catch (error) {
+        console.error('Delete error:', error);
+        alert('წაშლა ვერ მოხერხდა');
+      }
     }
     setShowDeletePopup(false);
     setPendingDeleteId(null);
@@ -244,27 +297,46 @@ export default function App() {
     });
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingEntry || !editingEntry.analysis) return;
 
-    setEntries(prev => prev.map(e => {
-      if (e.id === editingEntry.id) {
-        return {
-          ...e,
-          analysis: {
-            ...e.analysis!,
-            summary: editForm.name,
-            totalMacros: {
-              calories: Number(editForm.calories),
-              protein: Number(editForm.protein),
-              carbs: Number(editForm.carbs),
-              fat: Number(editForm.fat)
-            }
+    try {
+      const userId = AuthService.getCurrentUserId();
+      const updatedAnalysis = {
+        ...editingEntry.analysis,
+        summary: editForm.name,
+        totalMacros: {
+          calories: Number(editForm.calories),
+          protein: Number(editForm.protein),
+          carbs: Number(editForm.carbs),
+          fat: Number(editForm.fat)
+        }
+      };
+
+      const response = await APIService.updateFoodEntry(
+        editingEntry.id,
+        userId,
+        updatedAnalysis
+      );
+
+      if (response.success) {
+        setEntries(prev => prev.map(e => {
+          if (e.id === editingEntry.id) {
+            return {
+              ...e,
+              analysis: updatedAnalysis
+            };
           }
-        };
+          return e;
+        }));
+      } else {
+        alert('შეცვლა ვერ მოხერხდა: ' + (response.error || 'უცნობი შეცდომა'));
       }
-      return e;
-    }));
+    } catch (error) {
+      console.error('Edit error:', error);
+      alert('შეცვლა ვერ მოხერხდა');
+    }
+
     setEditingEntry(null);
   };
 
@@ -284,6 +356,44 @@ export default function App() {
     setSelectedEntry(null);
   };
 
+  const handleUpdateCalorieGoal = async (goal: number) => {
+    try {
+      const userId = AuthService.getCurrentUserId();
+      
+      if (currentUser) {
+        // Authenticated user - save to database
+        const response = await APIService.updateUserSettings(userId, goal);
+        
+        if (response.success) {
+          setCalorieGoal(goal);
+        } else {
+          alert('მიზნის შენახვა ვერ მოხერხდა: ' + (response.error || 'უცნობი შეცდომა'));
+        }
+      } else {
+        // Anonymous user - just update local state
+        setCalorieGoal(goal);
+      }
+    } catch (error) {
+      console.error('Update calorie goal error:', error);
+      alert('მიზნის შენახვა ვერ მოხერხდა');
+    }
+  };
+
+  const handleLogin = (user: any) => {
+    setCurrentUser(user);
+    // Reload data for the authenticated user
+    loadData();
+    loadUserSettings();
+  };
+
+  const handleLogout = () => {
+    AuthService.logout();
+    setCurrentUser(null);
+    setEntries([]);
+    setCalorieGoal(2200);
+    loadData(); // Load data for new anonymous user
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Sticky Header with Summary */}
@@ -292,13 +402,40 @@ export default function App() {
         date={currentDate}
         onDateChange={setCurrentDate}
         calorieGoal={calorieGoal}
-        onUpdateGoal={setCalorieGoal}
+        onUpdateGoal={handleUpdateCalorieGoal}
       />
 
       {/* Main Content Area */}
       <main className="max-w-md lg:max-w-4xl xl:max-w-6xl mx-auto px-4 lg:px-8 pt-6 relative">
         
-        {filteredEntries.length === 0 && (
+        {/* Loading State */}
+        {loading && (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{borderColor: '#f27141'}}></div>
+            <p className="text-gray-500 mt-4">მონაცემების ჩატვირთვა...</p>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="p-6 rounded-full mb-4 bg-red-100">
+                <span className="text-red-500 text-2xl">⚠️</span>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-800">შეცდომა</h2>
+            <p className="text-gray-500 mt-2">{error}</p>
+            <button 
+              onClick={loadData}
+              className="mt-4 px-4 py-2 rounded-lg text-white font-medium"
+              style={{backgroundColor: '#f27141'}}
+            >
+              თავიდან ცდა
+            </button>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!loading && !error && filteredEntries.length === 0 && (
           <div className="flex flex-col items-center justify-center py-12 text-center opacity-60">
             <div className="p-6 rounded-full mb-4" style={{backgroundColor: 'rgba(242, 113, 65, 0.1)'}}>
                 <CameraIcon className="w-12 h-12" style={{color: '#f27141'}} />
@@ -309,6 +446,14 @@ export default function App() {
                 ? "დააჭირე + ღილაკს ფოტოს გადასაღებად!" 
                 : "ამ დღეს მონაცემები არ არის."}
             </p>
+            {!currentUser && (
+              <button 
+                onClick={() => setShowAuthPrompt(true)}
+                className="mt-4 px-4 py-2 text-sm rounded-lg border border-orange-200 text-orange-600 hover:bg-orange-50 transition-colors"
+              >
+                შესვლა მონაცემების შესანახად
+              </button>
+            )}
           </div>
         )}
 
@@ -455,6 +600,13 @@ export default function App() {
 
       {/* PWA Install Prompt */}
       <PWAInstallPrompt />
+
+      {/* Auth Prompt */}
+      <AuthPrompt
+        isOpen={showAuthPrompt}
+        onClose={() => setShowAuthPrompt(false)}
+        onLogin={handleLogin}
+      />
     </div>
   );
 }
